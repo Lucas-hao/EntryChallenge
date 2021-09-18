@@ -9,9 +9,6 @@ public class DateTransUtils {
 
     private static final SimpleDateFormat timeFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.CHINA);
 
-    /**
-     * yyyy-MM-dd HH:mm:ss
-     */
     public static String stampToTime(long stamp) {
         return timeFormat.format(stamp);
     }
@@ -26,7 +23,13 @@ public class DateTransUtils {
     }
 
     public static long getDailyStartTime(long timeStamp) {
-        return getDailySetCalendar(timeStamp, 0, 0, 0).getTimeInMillis();
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTimeInMillis(timeStamp);
+        calendar.set(Calendar.HOUR_OF_DAY, 0);
+        calendar.set(Calendar.MINUTE, 0);
+        calendar.set(Calendar.SECOND, 0);
+        calendar.set(Calendar.MILLISECOND, 0);
+        return calendar.getTimeInMillis();
     }
 
     public static long getDailyEndTime(long timeStamp) {

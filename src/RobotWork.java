@@ -8,18 +8,42 @@ public class RobotWork {
         MORNING, DAY, NIGHT
     }
 
-    class RoboRate {
-        int[] mStartDay;
-        int[] mEndDay;
+    static class Time {
+        int hour;
+        int min;
+        int sec;
+
+        public Time(int h, int m, int s) {
+            hour = h;
+            min = m;
+            sec = s;
+        }
+
+        public static Time stringToTime(String timeString) {
+            String[] split = timeString.split(":");
+            int length = split.length;
+            if (length != 3) {
+                System.err.println("Invalid time input");
+                // TODO Error Handling
+            }
+            return new Time(Integer.parseInt(split[0]), Integer.parseInt(split[1]), Integer.parseInt(split[2]));
+        }
+    }
+
+    static class RoboRate {
+        Time mStartDay;
+        Time mEndDay;
         int[] mValue;
 
-        public RoboRate(String startTime, String endTime, int[] value) {
-            mStartDay = stringToTime(startTime);
-            mEndDay = stringToTime(endTime);
+        public RoboRate(String stdStart, String stdEnd, int[] value) {
+            mStartDay = Time.stringToTime(stdStart);
+            mEndDay = Time.stringToTime(stdEnd);
             if (value.length != 4) {
                 System.err.println("Warning: Invalid length of robot rate array");
+                mValue = new int []{0, 0, 0, 0};
+            } else {
+                mValue = value;
             }
-            mValue = value;
         }
     }
 
@@ -59,13 +83,28 @@ public class RobotWork {
                 new int[]{standardDay.getInt("value"), standardNight.getInt("value"),
                         extraDay.getInt("value"), extraNight.getInt("value")});
 
-        if (!standardDay.getString("start").equals(extraDay.getString("start")))
-            System.out.println("Warning: The workday start time is not the same as the weekend day");
 
-        if (!standardDay.getString("end").equals(extraDay.getString("end")))
-            System.out.println("Warning: The workday End time is not the same as the weekend day");
+        // Assume day end time is the same as the night start time
+        if (!standardDay.getString("end").equals(standardNight.getString("start"))
+                || !extraDay.getString("end").equals(extraNight.getString("start"))) {
+            System.err.println("Warning: Day end time is different from the night start time");
+        }
 
+        // and night end time is the same as the day start time
+        if (!standardDay.getString("start").equals(standardNight.getString("end"))
+                || !extraDay.getString("start").equals(extraNight.getString("end"))) {
+            System.err.println("Warning: Night end time is different from the day start time");
+        }
 
+        /*
+        Assume the standard day start time is the same as the extra night end time
+        and the standard night end time is the same as the extra day start time,
+        So the day start time and the day end time should all be the same
+         */
+        if (!standardDay.getString("start").equals(extraDay.getString("start"))
+                || !standardDay.getString("end").equals(extraDay.getString("end"))) {
+            System.err.println("Warning: Standard start time and end time is different from that of extraDay");
+        }
     }
 
     public void calculateValue() {
@@ -74,18 +113,16 @@ public class RobotWork {
         long start = DateTransUtils.timeToStamp(info.mStart);
         long end = DateTransUtils.timeToStamp(info.mEnd);
         Calendar currentTime = Calendar.getInstance();
-        /* Assume that the start of the day is the end of the night
-         * and the end of the day is the start of the night */
         Calendar nextTime = Calendar.getInstance();
         currentTime.setTimeInMillis(start);
-        boolean isDay = true;
-        boolean isWorkday = true;
+        boolean isDay;
+        boolean isWorkday;
         PeriodType type = PeriodType.MORNING;
 
         nextTime.setTimeInMillis(currentTime.getTimeInMillis());
-        setCalValue(nextTime, roboRate.mStartDay[0], roboRate.mStartDay[1], roboRate.mStartDay[2]);
+        setCalValue(nextTime, roboRate.mStartDay.hour, roboRate.mStartDay.min, roboRate.mStartDay.sec);
         if (currentTime.getTimeInMillis() > nextTime.getTimeInMillis()) {
-            setCalValue(nextTime, roboRate.mEndDay[0], roboRate.mEndDay[1], roboRate.mEndDay[2]);
+            setCalValue(nextTime, roboRate.mEndDay.hour, roboRate.mEndDay.min, roboRate.mEndDay.sec);
             if (currentTime.getTimeInMillis() > nextTime.getTimeInMillis()) {
                 nextTime.setTimeInMillis(DateTransUtils.getDailyEndTime(nextTime.getTimeInMillis()));
                 type = PeriodType.NIGHT;
@@ -99,8 +136,8 @@ public class RobotWork {
         }
 
         while (currentTime.getTimeInMillis() < end) {
-            System.out.println("Start: " + currentTime.getTime().toString());
-            System.out.println("End: " + nextTime.getTime().toString());
+            System.out.println("Start: " + currentTime.getTime());
+            System.out.println("End: " + nextTime.getTime());
             int currentValue;
             isWorkday = DateTransUtils.isWeekday(currentTime);
             isDay = (type == PeriodType.DAY);
@@ -129,7 +166,7 @@ public class RobotWork {
             if (currentTime.getTimeInMillis() >= nextTime.getTimeInMillis()) {
                 switch (type) {
                     case MORNING:
-                        setCalValue(nextTime, roboRate.mEndDay[0], roboRate.mEndDay[1], roboRate.mEndDay[2]);
+                        setCalValue(nextTime, roboRate.mEndDay.hour, roboRate.mEndDay.min, roboRate.mEndDay.sec);
                         type = PeriodType.DAY;
                         break;
                     case DAY:
@@ -137,7 +174,7 @@ public class RobotWork {
                         type = PeriodType.NIGHT;
                         break;
                     case NIGHT:
-                        setCalValue(nextTime, roboRate.mStartDay[0], roboRate.mStartDay[1], roboRate.mStartDay[2]);
+                        setCalValue(nextTime, roboRate.mStartDay.hour, roboRate.mStartDay.min, roboRate.mStartDay.sec);
                         type = PeriodType.MORNING;
                         break;
                 }
@@ -155,26 +192,9 @@ public class RobotWork {
         return value;
     }
 
-    public int[] stringToTime(String timeString) {
-        String[] split = timeString.split(":");
-        int length = split.length;
-        if (length != 3) {
-            System.err.println("Invalid time input");
-            // TODO Error Handling
-        }
-        return new int[]{Integer.parseInt(split[0]), Integer.parseInt(split[1]), Integer.parseInt(split[2])};
-    }
-
     public void setCalValue(Calendar cal, int hour, int minute, int second) {
         cal.set(Calendar.HOUR_OF_DAY, hour);
         cal.set(Calendar.MINUTE, minute);
         cal.set(Calendar.SECOND, second);
-    }
-
-    public boolean isDay(Calendar cal) {
-        int calTime = cal.get(Calendar.HOUR_OF_DAY) * 3600 + cal.get(Calendar.MINUTE) * 60 + cal.get(Calendar.SECOND);
-        int startT = roboRate.mStartDay[0] * 3600 + roboRate.mStartDay[1] * 60 + roboRate.mStartDay[2];
-        int endT = roboRate.mEndDay[0] * 3600 + roboRate.mEndDay[1] * 60 + roboRate.mEndDay[2];
-        return calTime > startT && calTime < endT;
     }
 }
